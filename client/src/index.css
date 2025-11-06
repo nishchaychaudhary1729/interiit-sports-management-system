@@ -1,13 +1,18 @@
 /* client/src/index.css */
 :root {
-  font-family: Arial, sans-serif;
-  --color-primary: #007bff; /* Blue */
-  --color-secondary: #6c757d; /* Gray */
-  --color-success: #28a745; /* Green */
-  --color-danger: #dc3545; /* Red */
-  --color-background: #f8f9fa; /* Light Gray */
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  --color-primary: #007bff; /* Blue - Action/Main Buttons */
+  --color-primary-dark: #004d99; /* Deep Blue - Header/Main Accent */
+  --color-secondary: #6c757d; /* Gray - Secondary Buttons */
+  --color-success: #28a745; /* Green - Success/Paid */
+  --color-danger: #dc3545; /* Red - Error/High Severity */
+  --color-warning: #ffc107; /* Yellow - Warning/Pending */
+  --color-background: #f8f9fa; /* Light Gray background */
   --color-white: #ffffff;
-  --color-dark: #343a40;
+  --color-dark: #343a40; /* Dark Text */
+
+  --padding-base: 15px;
+  --gap-base: 25px;
 }
 
 body {
@@ -19,28 +24,54 @@ body {
 
 #root {
   min-height: 100vh;
+  padding: 0; /* Remove root padding to let header go full width */
+  max-width: none;
+  width: 100%;
 }
 
 /* Base Form/Input Styling */
 input[type="text"], 
 input[type="email"], 
 input[type="date"], 
+input[type="time"],
 select, 
 button {
   padding: 10px;
-  border-radius: 4px;
+  border-radius: 6px;
   border: 1px solid #ced4da;
   box-sizing: border-box;
+  font-size: 0.95em;
 }
 
 button {
   cursor: pointer;
-  font-weight: bold;
+  font-weight: 600;
   transition: background-color 0.2s;
   color: var(--color-white);
   background-color: var(--color-primary);
+  border: none;
 }
 
 button:hover {
   background-color: #0056b3;
+}
+
+/* Table Styling Overrides for Consistency */
+table {
+  border-radius: 8px;
+  overflow: hidden; /* Ensures rounded corners clip the content */
+}
+
+/* Responsive breakpoint for main content areas */
+@media (max-width: 900px) {
+    /* Adjustments for smaller screens to make content less squished */
+    .responsive-flex-container {
+        flex-direction: column;
+    }
+
+    .responsive-flex-container > div {
+        min-width: 100% !important;
+        flex: 1 1 100% !important;
+        margin-bottom: var(--gap-base);
+    }
 }
