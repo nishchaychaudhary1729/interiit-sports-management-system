@@ -1,0 +1,46 @@
+/* client/src/index.css */
+:root {
+  font-family: Arial, sans-serif;
+  --color-primary: #007bff; /* Blue */
+  --color-secondary: #6c757d; /* Gray */
+  --color-success: #28a745; /* Green */
+  --color-danger: #dc3545; /* Red */
+  --color-background: #f8f9fa; /* Light Gray */
+  --color-white: #ffffff;
+  --color-dark: #343a40;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-background);
+  color: var(--color-dark);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Base Form/Input Styling */
+input[type="text"], 
+input[type="email"], 
+input[type="date"], 
+select, 
+button {
+  padding: 10px;
+  border-radius: 4px;
+  border: 1px solid #ced4da;
+  box-sizing: border-box;
+}
+
+button {
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.2s;
+  color: var(--color-white);
+  background-color: var(--color-primary);
+}
+
+button:hover {
+  background-color: #0056b3;
+}
