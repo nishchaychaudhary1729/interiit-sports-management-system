@@ -22,19 +22,37 @@ router.get('/data/lookup', async (req, res) => {
 
 // 1. READ ALL Participants (Including joined data for display)
 router.get('/', async (req, res) => {
+    // **NEW LOGIC START**
+    const { search } = req.query; // Get search term from query parameters
+    let sqlQuery = `
+        SELECT 
+            P.Participant_ID, P.Name, P.DOB, P.Gender, P.Email,
+            I.Short_Name AS Institute, 
+            H.Hostel_Name AS Hostel, 
+            M.Mess_Name AS Mess
+        FROM Participants P
+        JOIN Institutes I ON P.Institute_ID = I.Institute_ID
+        JOIN Hostels H ON P.Hostel_ID = H.Hostel_ID
+        JOIN Messes M ON P.Mess_ID = M.Mess_ID
+    `;
+    const queryParams = [];
+
+    if (search) {
+        // Construct the WHERE clause for search functionality
+        const searchTerm = `%${search}%`;
+        sqlQuery += `
+            WHERE P.Name LIKE ? OR I.Short_Name LIKE ? OR H.Hostel_Name LIKE ?
+        `;
+        queryParams.push(searchTerm, searchTerm, searchTerm);
+    }
+
+    sqlQuery += `
+        ORDER BY P.Institute_ID, P.Name
+    `;
+    // **NEW LOGIC END**
+
     try {
-        const [results] = await db.query(`
-            SELECT 
-                P.Participant_ID, P.Name, P.DOB, P.Gender, P.Email,
-                I.Short_Name AS Institute, 
-                H.Hostel_Name AS Hostel, 
-                M.Mess_Name AS Mess
-            FROM Participants P
-            JOIN Institutes I ON P.Institute_ID = I.Institute_ID
-            JOIN Hostels H ON P.Hostel_ID = H.Hostel_ID
-            JOIN Messes M ON P.Mess_ID = M.Mess_ID
-            ORDER BY P.Institute_ID, P.Name
-        `);
+        const [results] = await db.query(sqlQuery, queryParams);
         res.json(results);
     } catch (err) {
         console.error('Database Error in GET /api/participants:', err);
