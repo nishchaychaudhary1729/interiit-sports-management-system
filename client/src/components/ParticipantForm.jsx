@@ -19,16 +19,12 @@ function ParticipantForm({ onSave }) {
             const initialInstituteId = data.institutes[0]?.Institute_ID || '';
             const initialHostelId = data.hostels[0]?.Hostel_ID || '';
             
-            // Determine the Institute ID of the default Hostel (Hostels[0].Institute_ID)
             const defaultHostel = data.hostels.find(h => h.Hostel_ID === initialHostelId);
             const defaultHostInstituteId = defaultHostel ? defaultHostel.Institute_ID : null;
 
-            // Filter Messes based on the default Host Institute ID
             const initialFilteredMesses = data.messes.filter(m => m.Institute_ID === defaultHostInstituteId);
             const initialMessId = initialFilteredMesses[0]?.Mess_ID || '';
 
-
-            // Pre-set default IDs to ensure form submission has values
             setFormData(prev => ({
                 ...prev,
                 instituteId: initialInstituteId,
@@ -43,18 +39,11 @@ function ParticipantForm({ onSave }) {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    // --- LOGIC FOR CONDITIONAL FILTERING ---
     const currentHostelId = formData.hostelId;
-    
-    // Step 1: Find the Institute ID associated with the currently selected Hostel
     const selectedHostel = lookupData.hostels.find(h => h.Hostel_ID === parseInt(currentHostelId));
     const hostingInstituteId = selectedHostel ? selectedHostel.Institute_ID : null;
-
-    // Step 2: Filter Messes based on that Institute ID
     const filteredMesses = lookupData.messes.filter(m => m.Institute_ID === hostingInstituteId);
-    // --- END LOGIC ---
 
-    // Special handler for Hostel change to reset the Mess to the first valid option
     const handleHostelChange = (e) => {
         const newHostelId = e.target.value;
         const newSelectedHostel = lookupData.hostels.find(h => h.Hostel_ID === parseInt(newHostelId));
@@ -66,7 +55,7 @@ function ParticipantForm({ onSave }) {
         setFormData(prev => ({ 
             ...prev, 
             hostelId: newHostelId, 
-            messId: newMessId // Resetting messId to maintain institute consistency
+            messId: newMessId
         }));
     };
 
@@ -101,9 +90,9 @@ function ParticipantForm({ onSave }) {
             padding: '20px', 
             backgroundColor: 'var(--color-white)', 
             borderRadius: '8px', 
-            boxShadow: '0 0 10px rgba(0,0,0,0.1)' 
+            boxShadow: '0 4px 8px rgba(0,0,0,0.1)' 
         }}>
-            <h3 style={{ color: 'var(--color-primary)', borderBottom: '1px solid #ccc', paddingBottom: '10px' }}>Register Athlete</h3>
+            <h3 style={{ color: 'var(--color-primary-dark)', borderBottom: '1px solid #ccc', paddingBottom: '10px' }}>👤 Register Athlete</h3>
             {message && <p style={{ color: 'var(--color-success)', fontWeight: 'bold' }}>{message}</p>}
             {error && <p style={{ color: 'var(--color-danger)', fontWeight: 'bold' }}>{error}</p>}
             
@@ -111,7 +100,8 @@ function ParticipantForm({ onSave }) {
                 {/* Athlete Details */}
                 <input name="name" type="text" placeholder="Full Name" value={formData.name} onChange={handleChange} required />
                 <input name="email" type="email" placeholder="Email (Unique)" value={formData.email} onChange={handleChange} required />
-                <input name="dob" type="date" value={formData.dob} onChange={handleChange} required />
+                <label style={{ fontSize: '0.8em', color: 'var(--color-secondary)', marginTop: '-10px' }}>Date of Birth</label>
+                <input name="dob" type="date" value={formData.dob} onChange={handleChange} required style={{ marginTop: '-10px' }}/>
                 
                 <select name="gender" value={formData.gender} onChange={handleChange} required>
                     <option value="M">Male</option>
@@ -119,7 +109,7 @@ function ParticipantForm({ onSave }) {
                     <option value="O">Other</option>
                 </select>
 
-                {/* Home Institute (Participant's School) */}
+                {/* Home Institute */}
                 <label style={{ fontWeight: 'bold', marginTop: '10px', color: 'var(--color-dark)' }}>Home Institute:</label>
                 <select name="instituteId" value={formData.instituteId} onChange={handleChange} required>
                     {lookupData.institutes.map(inst => (
@@ -127,8 +117,8 @@ function ParticipantForm({ onSave }) {
                     ))}
                 </select>
                 
-                {/* Accommodation - HOSTEL (Triggers Mess Filter) */}
-                <label style={{ fontWeight: 'bold', marginTop: '10px', color: 'var(--color-dark)' }}>Assigned Hostel:</label>
+                {/* Accommodation - HOSTEL */}
+                <label style={{ fontWeight: 'bold', marginTop: '10px', color: 'var(--color-dark)' }}>Assigned Hostel (Hosting Inst):</label>
                 <select name="hostelId" value={formData.hostelId} onChange={handleHostelChange} required>
                     {lookupData.hostels.map(hostel => (
                         <option key={hostel.Hostel_ID} value={hostel.Hostel_ID}>
@@ -137,7 +127,7 @@ function ParticipantForm({ onSave }) {
                     ))}
                 </select>
 
-                {/* Accommodation - MESS (Filtered by selected Hostel's Institute ID) */}
+                {/* Accommodation - MESS (Filtered) */}
                 <label style={{ fontWeight: 'bold', color: 'var(--color-dark)' }}>Assigned Mess (Filtered):</label>
                 <select name="messId" value={formData.messId} onChange={handleChange} required disabled={filteredMesses.length === 0}>
                     {filteredMesses.length > 0 ? (
