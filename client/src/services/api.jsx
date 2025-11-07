@@ -320,3 +320,98 @@ export const createIncident = async (incidentData) => {
         throw error.response.data;
     }
 };
+
+// --- TEAMS API ---
+export const fetchInstitutes = async () => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/teams/institutes`);
+        return response.data;
+    } catch (error) {
+        console.error('API Error: Failed to fetch institutes.', error);
+        throw error;
+    }
+};
+
+export const fetchTeamEvents = async () => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/teams/team-events`);
+        return response.data;
+    } catch (error) {
+        console.error('API Error: Failed to fetch team events.', error);
+        throw error;
+    }
+};
+
+export const fetchParticipantsByInstitute = async (instituteId, gender = 'Mixed') => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/teams/participants/${instituteId}/${gender}`);
+        return response.data;
+    } catch (error) {
+        console.error('API Error: Failed to fetch participants.', error);
+        throw error;
+    }
+};
+
+
+
+export const fetchTeams = async (filters = {}) => {
+    try {
+        const params = new URLSearchParams(filters).toString();
+        const response = await axios.get(`${API_BASE_URL}/teams/teams${params ? `?${params}` : ''}`);
+        return response.data;
+    } catch (error) {
+        console.error('API Error: Failed to fetch teams.', error);
+        throw error;
+    }
+};
+
+
+export const createTeam = async (teamData) => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/teams/teams`, teamData);
+        return response.data;
+    } catch (error) {
+        console.error('API Error: Failed to create team.', error.response?.data || error);
+        throw error.response?.data || error;
+    }
+};
+
+export const updateTeamStatus = async (teamId, isActive) => {
+    try {
+        const response = await axios.put(`${API_BASE_URL}/teams/teams/${teamId}/status`, { isActive });
+        return response.data;
+    } catch (error) {
+        console.error('API Error: Failed to update team status.', error);
+        throw error;
+    }
+};
+export const checkTeamExists = async (instituteId, eventId) => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/teams/teams/check/${instituteId}/${eventId}`);
+        return response.data;
+    } catch (error) {
+        console.error('API Error: Failed to check team.', error);
+        throw error;
+    }
+};
+
+export const updateTeamMembers = async (teamId, memberData) => {
+    try {
+        const response = await axios.put(`${API_BASE_URL}/teams/teams/${teamId}/members`, memberData);
+        return response.data;
+    } catch (error) {
+        console.error('API Error: Failed to update team members.', error);
+        throw error;
+    }
+};
+
+export const fetchTeamDetails = async (teamId) => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/teams/teams/${teamId}`);
+        return response.data;
+    } catch (error) {
+        console.error('API Error: Failed to fetch team details.', error);
+        throw error;
+    }
+};
+

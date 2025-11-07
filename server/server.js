@@ -19,6 +19,7 @@ const eventRoutes = require('./routes/events');
 const logisticsRoutes = require('./routes/logistics');
 // NEW FINANCIALS IMPORT
 const financialRoutes = require('./routes/financials');
+const teamsRoutes = require('./routes/teams');
 
 // Mount Routes
 app.use('/api/participants', participantRoutes);
@@ -27,6 +28,7 @@ app.use('/api/events', eventRoutes);
 app.use('/api/logistics', logisticsRoutes);
 // NEW FINANCIALS MOUNT
 app.use('/api/financials', financialRoutes);
+app.use('/api/teams', teamsRoutes);
 
 app.get('/', (req, res) => {
     res.send('Sports Management API is Running!');

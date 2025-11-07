@@ -868,3 +868,12 @@ UNLOCK TABLES;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 -- Dump completed on 2025-11-05 20:43:55
+
+
+
+ALTER TABLE equipment_checkouts MODIFY Checkout_ID INT NOT NULL AUTO_INCREMENT;
+
+
+
+
+
