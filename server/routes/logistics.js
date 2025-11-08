@@ -1,4 +1,5 @@
 // server/routes/logistics.js
+
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
@@ -42,30 +43,30 @@ router.post('/staff', async (req, res) => {
         return res.status(400).json({ message: 'Missing required staff fields (Name, Email, Role).' });
     }
 
-    // Determine the next available Staff_ID (assuming 151 was last + 1)
-    const [lastStaff] = await db.query('SELECT MAX(Staff_ID) + 1 AS NextID FROM Staff');
-    const nextStaffId = lastStaff[0].NextID || 152; 
-
     try {
+        const [lastStaff] = await db.query('SELECT IFNULL(MAX(Staff_ID), 0) + 1 AS NextID FROM Staff');
+        const nextStaffId = lastStaff[0].NextID;
+
         const query = `
-            INSERT INTO Staff 
+            INSERT INTO Staff
             (Staff_ID, Name, Date_of_Birth, Email, Phone, Role_ID)
             VALUES (?, ?, ?, ?, ?, ?)
         `;
-        const [result] = await db.query(query, [nextStaffId, name, dob, email, phone || null, roleId]);
-
-        res.status(201).json({ 
-            message: `Staff member ${name} registered successfully. ID: ${nextStaffId}`, 
-            id: nextStaffId 
+        
+        await db.query(query, [nextStaffId, name, dob, email, phone || null, roleId]);
+        
+        res.status(201).json({
+            message: `Staff member ${name} registered successfully. ID: ${nextStaffId}`,
+            id: nextStaffId
         });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
             return res.status(400).json({ message: 'Registration failed. Email or Phone number already in use.' });
         }
         console.error('Error registering staff member:', err.message);
-        res.status(400).json({ 
+        res.status(400).json({
             message: 'Staff registration failed due to a database error.',
-            error: err.code 
+            error: err.code
         });
     }
 });
@@ -119,37 +120,32 @@ router.post('/equipment/checkout', async (req, res) => {
     if (!staffId || !itemId) {
         return res.status(400).json({ message: 'Missing Staff ID or Item ID for checkout.' });
     }
-    
+
     let connection;
     try {
         connection = await db.getConnection();
         await connection.beginTransaction();
 
-        // Check current item status
         const [itemStatus] = await connection.query('SELECT Status FROM Equipment_Items WHERE Item_ID = ?', [itemId]);
         if (itemStatus.length === 0 || itemStatus[0].Status !== 'Available') {
             await connection.rollback();
             return res.status(400).json({ message: 'Item is not available for checkout (Status must be "Available").' });
         }
-        
-        // 1. Update Equipment Status to 'Issued'
+
         await connection.query("UPDATE Equipment_Items SET Status = 'Issued' WHERE Item_ID = ?", [itemId]);
 
-        // 2. Insert new checkout record
-        // Assuming Checkout_ID is auto-incremented or manually managed to continue from dump (831)
         const checkoutQuery = `
-            INSERT INTO Equipment_Checkouts 
+            INSERT INTO Equipment_Checkouts
             (Staff_ID, Item_ID, Checkout_time)
             VALUES (?, ?, NOW())
         `;
         const [result] = await connection.query(checkoutQuery, [staffId, itemId]);
 
         await connection.commit();
-        res.status(201).json({ 
-            message: `Equipment ${itemId} checked out successfully by Staff ${staffId}.`, 
-            checkoutId: result.insertId 
+        res.status(201).json({
+            message: `Equipment ${itemId} checked out successfully by Staff ${staffId}.`,
+            checkoutId: result.insertId
         });
-
     } catch (err) {
         if (connection) await connection.rollback();
         console.error('Error checking out equipment:', err.message);
@@ -168,23 +164,20 @@ router.put('/equipment/checkin/:itemId', async (req, res) => {
         connection = await db.getConnection();
         await connection.beginTransaction();
 
-        // 1. Update the latest open checkout record (Checkin_time)
         const [checkoutResult] = await connection.query(
             'UPDATE Equipment_Checkouts SET Checkin_time = NOW() WHERE Item_ID = ? AND Checkin_time IS NULL ORDER BY Checkout_time DESC LIMIT 1',
             [itemId]
         );
 
         if (checkoutResult.affectedRows === 0) {
-             await connection.rollback();
+            await connection.rollback();
             return res.status(400).json({ message: 'No active checkout found for this item.' });
         }
-        
-        // 2. Update Equipment Status back to 'Available'
+
         await connection.query("UPDATE Equipment_Items SET Status = 'Available' WHERE Item_ID = ?", [itemId]);
 
         await connection.commit();
         res.json({ message: `Equipment ${itemId} checked in successfully.` });
-
     } catch (err) {
         if (connection) await connection.rollback();
         console.error('Error checking in equipment:', err.message);
@@ -194,63 +187,7 @@ router.put('/equipment/checkin/:itemId', async (req, res) => {
     }
 });
 
-// 8. Transport Placeholder Routes
-router.get('/transport', (req, res) => {
-    res.status(501).json({ message: 'Transport routes not yet implemented.' });
-});
-
-
-// 8. Fetch Transport Routes (READ)
-router.get('/transport/routes', async (req, res) => {
-    try {
-        const [routes] = await db.query('SELECT Route_ID, Route_Name, Description FROM Transport_Routes ORDER BY Route_ID');
-        res.json(routes);
-    } catch (err) {
-        console.error('Error fetching transport routes:', err);
-        res.status(500).json({ message: 'Failed to fetch transport routes data.' });
-    }
-});
-
-// 9. Fetch Transport Vehicles (READ)
-router.get('/transport/vehicles', async (req, res) => {
-    try {
-        const [vehicles] = await db.query(`
-            SELECT 
-                TV.Vehicle_ID, TV.Vehicle_Name, TV.License_plate, TV.Capacity,
-                TR.Route_Name AS Default_Route_Name
-            FROM Transport_Vehicles TV
-            JOIN Transport_Routes TR ON TV.Route_ID = TR.Route_ID
-            ORDER BY TV.Vehicle_Name
-        `);
-        res.json(vehicles);
-    } catch (err) {
-        console.error('Error fetching transport vehicles:', err);
-        res.status(500).json({ message: 'Failed to fetch transport vehicles data.' });
-    }
-});
-
-// 10. Fetch Transport Schedules (READ)
-router.get('/transport/schedules', async (req, res) => {
-    try {
-        const [schedules] = await db.query(`
-            SELECT 
-                TS.Schedule_ID, TS.Departure_time,
-                TR.Route_Name, 
-                S.Name AS Staff_Driver,
-                TV.Vehicle_Name, TV.License_plate
-            FROM Transport_Schedules TS
-            JOIN Transport_Routes TR ON TS.Route_ID = TR.Route_ID
-            JOIN Staff S ON TS.Staff_ID = S.Staff_ID
-            JOIN Transport_Vehicles TV ON TS.Vehicle_ID = TV.Vehicle_ID
-            ORDER BY TS.Departure_time DESC
-        `);
-        res.json(schedules);
-    } catch (err) {
-        console.error('Error fetching transport schedules:', err);
-        res.status(500).json({ message: 'Failed to fetch transport schedules data.' });
-    }
-});
-
+// --- TRANSPORT ROUTES ---
 
 // 8. Fetch Transport Routes (READ)
 router.get('/transport/routes', async (req, res) => {
@@ -266,13 +203,15 @@ router.get('/transport/routes', async (req, res) => {
 // 8.1. Create New Route (CREATE)
 router.post('/transport/routes', async (req, res) => {
     const { routeId, routeName, description } = req.body;
+    
     if (!routeId || !routeName) {
         return res.status(400).json({ message: 'Missing Route ID or Name.' });
     }
+
     try {
         const query = 'INSERT INTO Transport_Routes (Route_ID, Route_Name, Description) VALUES (?, ?, ?)';
-        const [result] = await db.query(query, [routeId, routeName, description || null]);
-        res.status(201).json({ message: `Route ${routeName} created successfully.`, id: result.insertId });
+        await db.query(query, [routeId, routeName, description || null]);
+        res.status(201).json({ message: `Route ${routeName} created successfully.`, id: routeId });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
             return res.status(400).json({ message: 'Route ID or Name already exists.' });
@@ -281,7 +220,6 @@ router.post('/transport/routes', async (req, res) => {
         res.status(500).json({ message: 'Failed to create route.' });
     }
 });
-
 
 // 9. Fetch Transport Vehicles (READ)
 router.get('/transport/vehicles', async (req, res) => {
@@ -304,13 +242,15 @@ router.get('/transport/vehicles', async (req, res) => {
 // 9.1. Create New Vehicle (CREATE)
 router.post('/transport/vehicles', async (req, res) => {
     const { vehicleId, vehicleName, licensePlate, capacity, defaultRouteId } = req.body;
+    
     if (!vehicleId || !vehicleName || !licensePlate || !capacity || !defaultRouteId) {
         return res.status(400).json({ message: 'Missing required vehicle fields.' });
     }
+
     try {
         const query = 'INSERT INTO Transport_Vehicles (Vehicle_ID, Vehicle_Name, License_plate, Capacity, Route_ID) VALUES (?, ?, ?, ?, ?)';
-        const [result] = await db.query(query, [vehicleId, vehicleName, licensePlate, capacity, defaultRouteId]);
-        res.status(201).json({ message: `Vehicle ${vehicleName} added successfully.`, id: result.insertId });
+        await db.query(query, [vehicleId, vehicleName, licensePlate, capacity, defaultRouteId]);
+        res.status(201).json({ message: `Vehicle ${vehicleName} added successfully.`, id: vehicleId });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
             return res.status(400).json({ message: 'Vehicle ID or License Plate already exists.' });
@@ -326,7 +266,7 @@ router.get('/transport/schedules', async (req, res) => {
         const [schedules] = await db.query(`
             SELECT 
                 TS.Schedule_ID, TS.Departure_time,
-                TR.Route_Name, 
+                TR.Route_Name,
                 S.Name AS Staff_Driver,
                 TV.Vehicle_Name, TV.License_plate
             FROM Transport_Schedules TS
@@ -342,17 +282,23 @@ router.get('/transport/schedules', async (req, res) => {
     }
 });
 
-// 10.1. Create New Schedule (CREATE)
+// 10.1. Create New Schedule (CREATE) - ✅ FIXED
 router.post('/transport/schedules', async (req, res) => {
     const { staffId, routeId, vehicleId, departureTime } = req.body;
+    
     if (!staffId || !routeId || !vehicleId || !departureTime) {
         return res.status(400).json({ message: 'Missing required schedule fields.' });
     }
+
     try {
-        // Schedule_ID is likely auto-incremented, relying on DB default.
-        const query = 'INSERT INTO Transport_Schedules (Staff_ID, Route_ID, Vehicle_ID, Departure_time) VALUES (?, ?, ?, ?)';
-        const [result] = await db.query(query, [staffId, routeId, vehicleId, departureTime]);
-        res.status(201).json({ message: `Schedule ID ${result.insertId} created successfully.`, id: result.insertId });
+        // ✅ FIXED: Get next Schedule_ID manually
+        const [maxIdResult] = await db.query('SELECT IFNULL(MAX(Schedule_ID), 0) + 1 as nextId FROM Transport_Schedules');
+        const nextScheduleId = maxIdResult[0].nextId;
+
+        const query = 'INSERT INTO Transport_Schedules (Schedule_ID, Staff_ID, Route_ID, Vehicle_ID, Departure_time) VALUES (?, ?, ?, ?, ?)';
+        await db.query(query, [nextScheduleId, staffId, routeId, vehicleId, departureTime]);
+        
+        res.status(201).json({ message: `Schedule ID ${nextScheduleId} created successfully.`, id: nextScheduleId });
     } catch (err) {
         console.error('Error creating schedule:', err.message);
         res.status(500).json({ message: 'Failed to create schedule.' });

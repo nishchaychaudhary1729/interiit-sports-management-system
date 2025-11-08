@@ -1,4 +1,5 @@
 // server/routes/events.js
+
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
@@ -10,7 +11,7 @@ router.get('/data/events-list', async (req, res) => {
     try {
         const [events] = await db.query(`
             SELECT 
-                E.Event_ID, E.Name AS Event_Name, E.Gender, E.Registration_Fee, 
+                E.Event_ID, E.Name AS Event_Name, E.Gender, E.Registration_Fee,
                 S.Name AS Sport_Name, S.Type AS Sport_Type
             FROM Events E
             JOIN Sports S ON E.Sport_ID = S.Sport_ID
@@ -29,7 +30,7 @@ router.get('/data/teams-list', async (req, res) => {
         const [teams] = await db.query(`
             SELECT 
                 T.Team_ID, T.Team_Name, T.Is_Active,
-                I.Short_Name AS Institute, 
+                I.Short_Name AS Institute,
                 E.Name AS Event_Name
             FROM Teams T
             JOIN Institutes I ON T.Institute_ID = I.Institute_ID
@@ -55,34 +56,36 @@ router.get('/data/venues-list', async (req, res) => {
     }
 });
 
-
 // --- MATCH CRUD ROUTES ---
 
-// 4. CREATE Match (POST /matches)
+// 4. CREATE Match (POST /matches) - ✅ FIXED
 router.post('/matches', async (req, res) => {
     const { eventId, venueId, matchDate, startTime, matchType, isTeamSport, competitor1Id, competitor2Id } = req.body;
     
     if (!eventId || !venueId || !startTime || !competitor1Id || !competitor2Id) {
         return res.status(400).json({ message: 'Missing required match scheduling fields.' });
     }
-    
+
     let connection;
     try {
         connection = await db.getConnection();
         await connection.beginTransaction();
 
-        // 1. Insert into Matches table
+        // ✅ FIXED: Get next Match_ID manually
+        const [maxIdResult] = await connection.query('SELECT IFNULL(MAX(Match_ID), 0) + 1 as nextId FROM Matches');
+        const nextMatchId = maxIdResult[0].nextId;
+
+        // 1. Insert into Matches table with manual Match_ID
         const matchQuery = `
             INSERT INTO Matches 
-            (Event_ID, Venue_ID, Match_Date, Start_time, Match_Type, Status)
-            VALUES (?, ?, ?, ?, ?, 'Scheduled')
+            (Match_ID, Event_ID, Venue_ID, Match_Date, Start_time, Match_Type, Status)
+            VALUES (?, ?, ?, ?, ?, ?, 'Scheduled')
         `;
-        const [matchResult] = await connection.query(matchQuery, [eventId, venueId, matchDate, startTime, matchType]);
-        const matchId = matchResult.insertId;
-        
+        await connection.query(matchQuery, [nextMatchId, eventId, venueId, matchDate, startTime, matchType]);
+
         // 2. Determine next available Match_Competitor_ID
-        const [lastCompetitor] = await connection.query('SELECT MAX(Match_Competitor_ID) + 1 as NextID FROM Match_Competitors');
-        let nextCompetitorId = lastCompetitor[0].NextID || 3071;
+        const [lastCompetitor] = await connection.query('SELECT IFNULL(MAX(Match_Competitor_ID), 3070) + 1 as NextID FROM Match_Competitors');
+        let nextCompetitorId = lastCompetitor[0].NextID;
 
         // 3. Insert Competitors
         const competitorQuery = `
@@ -90,19 +93,19 @@ router.post('/matches', async (req, res) => {
             (Match_Competitor_ID, Match_ID, Team_ID, Participant_ID)
             VALUES (?, ?, ?, ?)
         `;
-        
+
         // Competitor 1
         const team1Id = isTeamSport ? competitor1Id : null;
         const participant1Id = isTeamSport ? null : competitor1Id;
-        await connection.query(competitorQuery, [nextCompetitorId++, matchId, team1Id, participant1Id]);
-        
+        await connection.query(competitorQuery, [nextCompetitorId++, nextMatchId, team1Id, participant1Id]);
+
         // Competitor 2
         const team2Id = isTeamSport ? competitor2Id : null;
         const participant2Id = isTeamSport ? null : competitor2Id;
-        await connection.query(competitorQuery, [nextCompetitorId, matchId, team2Id, participant2Id]);
+        await connection.query(competitorQuery, [nextCompetitorId, nextMatchId, team2Id, participant2Id]);
 
         await connection.commit();
-        res.status(201).json({ message: 'Match scheduled successfully.', matchId: matchId });
+        res.status(201).json({ message: 'Match scheduled successfully.', matchId: nextMatchId });
 
     } catch (err) {
         if (connection) await connection.rollback();
@@ -115,10 +118,9 @@ router.post('/matches', async (req, res) => {
 
 // 5. READ Matches (GET /matches) - Including competitor details
 router.get('/matches', async (req, res) => {
-    const { status = 'Scheduled' } = req.query; // Filter by status
+    const { status = 'Scheduled' } = req.query;
     
     try {
-        // Query aggregates competitor names and IDs
         const [matches] = await db.query(`
             SELECT 
                 M.Match_ID, M.Start_time, M.Match_Type, M.Status, M.Score_Summary AS Final_Score,
@@ -126,7 +128,7 @@ router.get('/matches', async (req, res) => {
                 V.Name AS Venue_Name,
                 GROUP_CONCAT(CASE WHEN MC.Team_ID IS NOT NULL THEN T.Team_Name ELSE P.Name END ORDER BY MC.Match_Competitor_ID SEPARATOR ' vs ') AS Competitors,
                 GROUP_CONCAT(CASE WHEN MC.Team_ID IS NOT NULL THEN MC.Team_ID ELSE MC.Participant_ID END ORDER BY MC.Match_Competitor_ID) AS CompetitorIDs,
-                M.Winner_ID 
+                M.Winner_ID
             FROM Matches M
             JOIN Events E ON M.Event_ID = E.Event_ID
             JOIN Venues V ON M.Venue_ID = V.Venue_ID
@@ -138,11 +140,10 @@ router.get('/matches', async (req, res) => {
             ORDER BY M.Start_time ASC
         `, [status]);
 
-        // Process results to correctly format Competitor IDs array (for frontend use)
         const processedMatches = matches.map(m => ({
             ...m,
             CompetitorIDs: m.CompetitorIDs ? m.CompetitorIDs.split(',').map(id => parseInt(id)) : [],
-            isTeamSport: m.CompetitorIDs.length > 0 && m.Competitors.includes('Team') // Simplistic way to infer team sport
+            isTeamSport: m.CompetitorIDs.length > 0 && m.Competitors.includes('Team')
         }));
 
         res.json(processedMatches);
@@ -152,11 +153,11 @@ router.get('/matches', async (req, res) => {
     }
 });
 
-
 // 6. UPDATE Match Result (PUT /results/:matchId)
+// 6. UPDATE Match Result (PUT /results/:matchId) - ✅ FIXED
 router.put('/results/:matchId', async (req, res) => {
     const { matchId } = req.params;
-    const { winnerId, finalScore } = req.body; 
+    const { winnerId, finalScore } = req.body;
     
     if (!winnerId || !finalScore) {
         return res.status(400).json({ message: 'Missing winner ID or final score.' });
@@ -172,10 +173,13 @@ router.put('/results/:matchId', async (req, res) => {
             UPDATE Matches SET Status = 'Completed', Winner_ID = ?, Score_Summary = ? WHERE Match_ID = ?
         `;
         await connection.query(updateMatchQuery, [winnerId, finalScore, matchId]);
-        
-        // 2. Determine winner type for Match_Outcomes table (Team vs Individual)
-        const [competitors] = await connection.query('SELECT Team_ID, Participant_ID FROM Match_Competitors WHERE Match_ID = ? AND (Team_ID = ? OR Participant_ID = ?)', [matchId, winnerId, winnerId]);
-        
+
+        // 2. Determine winner type
+        const [competitors] = await connection.query(
+            'SELECT Team_ID, Participant_ID FROM Match_Competitors WHERE Match_ID = ? AND (Team_ID = ? OR Participant_ID = ?)', 
+            [matchId, winnerId, winnerId]
+        );
+
         let winningTeamId = null;
         let winningParticipantId = null;
 
@@ -186,17 +190,21 @@ router.put('/results/:matchId', async (req, res) => {
                 winningParticipantId = winnerId;
             }
         }
-        
-        // 3. Insert or Update Match_Outcomes
+
+        // ✅ FIXED: Get next Outcome_ID manually
+        const [maxOutcomeIdResult] = await connection.query('SELECT IFNULL(MAX(Outcome_ID), 0) + 1 as nextId FROM Match_Outcomes');
+        const nextOutcomeId = maxOutcomeIdResult[0].nextId;
+
+        // 3. Insert Match_Outcomes with manual Outcome_ID
         const insertOutcomeQuery = `
-            INSERT INTO Match_Outcomes (Match_ID, Winning_Team_ID, Winning_Participant_ID, Final_Score) 
-            VALUES (?, ?, ?, ?)
+            INSERT INTO Match_Outcomes (Outcome_ID, Match_ID, Winning_Team_ID, Winning_Participant_ID, Final_Score)
+            VALUES (?, ?, ?, ?, ?)
         `;
-        await connection.query(insertOutcomeQuery, [matchId, winningTeamId, winningParticipantId, finalScore]);
-        
+        await connection.query(insertOutcomeQuery, [nextOutcomeId, matchId, winningTeamId, winningParticipantId, finalScore]);
+
         await connection.commit();
         res.json({ message: `Match ${matchId} completed and result recorded.` });
-        
+
     } catch (err) {
         if (connection) await connection.rollback();
         console.error('Error updating match result:', err.message);
@@ -209,7 +217,7 @@ router.put('/results/:matchId', async (req, res) => {
 
 // --- REGISTRATION ROUTES ---
 
-// 7. Register Participant for an Individual Event (Event_Registrations table)
+// 7. Register Participant for an Individual Event
 router.post('/register/individual', async (req, res) => {
     const { participantId, eventId } = req.body;
     
@@ -222,26 +230,25 @@ router.post('/register/individual', async (req, res) => {
             'INSERT INTO Event_Registrations (Participant_ID, Event_ID) VALUES (?, ?)',
             [participantId, eventId]
         );
-
-        res.status(201).json({ 
-            message: `Participant ${participantId} registered for Event ${eventId} successfully.`, 
-            id: result.insertId 
+        res.status(201).json({
+            message: `Participant ${participantId} registered for Event ${eventId} successfully.`,
+            id: result.insertId
         });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
             return res.status(400).json({ message: 'Participant is already registered for this event.' });
         }
         console.error('Error registering for individual event:', err.message);
-        res.status(400).json({ 
+        res.status(400).json({
             message: 'Individual registration failed. Check foreign keys or unique constraints.',
-            error: err.code 
+            error: err.code
         });
     }
 });
 
-// 8. Assign Participant to a Team (Team_Members table)
+// 8. Assign Participant to a Team
 router.post('/register/team', async (req, res) => {
-    const { participantId, teamId, role = 'Player' } = req.body; 
+    const { participantId, teamId, role = 'Player' } = req.body;
     
     if (!participantId || !teamId) {
         return res.status(400).json({ message: 'Missing participant ID or team ID.' });
@@ -252,22 +259,20 @@ router.post('/register/team', async (req, res) => {
             'INSERT INTO Team_Members (Team_ID, Participant_ID, Role) VALUES (?, ?, ?)',
             [teamId, participantId, role]
         );
-
-        res.status(201).json({ 
-            message: `Participant ${participantId} assigned to Team ${teamId} as ${role} successfully.`, 
-            id: result.insertId 
+        res.status(201).json({
+            message: `Participant ${participantId} assigned to Team ${teamId} as ${role} successfully.`,
+            id: result.insertId
         });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
             return res.status(400).json({ message: 'Participant is already a member of this team.' });
         }
         console.error('Error assigning to team:', err.message);
-        res.status(400).json({ 
+        res.status(400).json({
             message: 'Team assignment failed. Check foreign keys or unique constraints.',
-            error: err.code 
+            error: err.code
         });
     }
 });
-
 
 module.exports = router;

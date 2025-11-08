@@ -567,10 +567,10 @@ const TeamsManagement = () => {
                                         onClick={() => toggleTeamStatus(team.id, team.isActive)}
                                         style={{
                                             ...styles.actionButton,
-                                            ...(team.isActive ? styles.deactivateButton : styles.activateButton)
+                                            ...(team.isActive ? styles.RemoveButton : styles.activateButton)
                                         }}
                                     >
-                                        {team.isActive ? 'Deactivate' : 'Activate'}
+                                        {team.isActive ? 'Remove' : 'Activate'}
                                     </button>
                                 </div>
                             ))}
@@ -932,7 +932,7 @@ const styles = {
         cursor: 'pointer',
         transition: 'all 0.2s'
     },
-    deactivateButton: {
+    RemoveButton: {
         background: '#fee2e2',
         color: '#991b1b'
     },

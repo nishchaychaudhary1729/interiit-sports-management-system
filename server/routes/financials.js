@@ -1,4 +1,5 @@
 // server/routes/financials.js
+
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
@@ -25,7 +26,7 @@ router.get('/transactions', async (req, res) => {
     }
 });
 
-// 2. Add New Transaction (Fine/Sponsorship/Registration) (CREATE)
+// 2. Add New Transaction (Fine/Sponsorship/Registration) (CREATE) - ✅ FIXED
 router.post('/transactions', async (req, res) => {
     const { participantId, eventId, amount, transactionDate, paymentStatus, type } = req.body;
     
@@ -34,26 +35,30 @@ router.post('/transactions', async (req, res) => {
     }
 
     try {
+        // ✅ FIXED: Get next Transaction_ID manually
+        const [maxIdResult] = await db.query('SELECT IFNULL(MAX(Transaction_ID), 0) + 1 as nextId FROM Financial_Transactions');
+        const nextTransactionId = maxIdResult[0].nextId;
+
         const query = `
             INSERT INTO Financial_Transactions 
-            (Participant_ID, Event_ID, Amount, Transaction_Date, Payment_Status, Type) 
-            VALUES (?, ?, ?, ?, ?, ?)
+            (Transaction_ID, Participant_ID, Event_ID, Amount, Transaction_Date, Payment_Status, Type)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         `;
-        const [result] = await db.query(query, [participantId, eventId, amount, transactionDate, paymentStatus, type]);
-
-        res.status(201).json({ 
-            message: `${type} transaction recorded successfully. ID: ${result.insertId}`, 
-            id: result.insertId 
+        
+        await db.query(query, [nextTransactionId, participantId, eventId, amount, transactionDate, paymentStatus, type]);
+        
+        res.status(201).json({
+            message: `${type} transaction recorded successfully. ID: ${nextTransactionId}`,
+            id: nextTransactionId
         });
     } catch (err) {
         console.error(`Error recording ${type} transaction:`, err.message);
-        res.status(500).json({ 
+        res.status(500).json({
             message: `Failed to record ${type} transaction due to a database error.`,
-            error: err.code 
+            error: err.code
         });
     }
 });
-
 
 // --- INCIDENT REPORTS ROUTES ---
 
@@ -77,8 +82,7 @@ router.get('/incidents', async (req, res) => {
     }
 });
 
-
-// 4. Create New Incident Report (CREATE)
+// 4. Create New Incident Report (CREATE) - ✅ FIXED
 router.post('/incidents', async (req, res) => {
     const { participantId, staffId, description, severity, actionTaken } = req.body;
     
@@ -87,25 +91,29 @@ router.post('/incidents', async (req, res) => {
     }
 
     try {
+        // ✅ FIXED: Get next Report_ID manually
+        const [maxIdResult] = await db.query('SELECT IFNULL(MAX(Report_ID), 0) + 1 as nextId FROM Incident_Reports');
+        const nextReportId = maxIdResult[0].nextId;
+
         const query = `
             INSERT INTO Incident_Reports 
-            (Participant_ID, Staff_ID, Time, Description, Severity, Action_taken) 
-            VALUES (?, ?, NOW(), ?, ?, ?)
+            (Report_ID, Participant_ID, Staff_ID, Time, Description, Severity, Action_taken)
+            VALUES (?, ?, ?, NOW(), ?, ?, ?)
         `;
-        const [result] = await db.query(query, [participantId || null, staffId, description, severity, actionTaken || null]);
-
-        res.status(201).json({ 
-            message: `Incident report ID ${result.insertId} filed successfully.`, 
-            id: result.insertId 
+        
+        await db.query(query, [nextReportId, participantId || null, staffId, description, severity, actionTaken || null]);
+        
+        res.status(201).json({
+            message: `Incident report ID ${nextReportId} filed successfully.`,
+            id: nextReportId
         });
     } catch (err) {
         console.error('Error creating incident report:', err.message);
-        res.status(500).json({ 
+        res.status(500).json({
             message: 'Failed to create incident report.',
-            error: err.code 
+            error: err.code
         });
     }
 });
-
 
 module.exports = router;
