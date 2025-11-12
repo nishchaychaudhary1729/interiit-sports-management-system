@@ -874,6 +874,65 @@ UNLOCK TABLES;
 ALTER TABLE equipment_checkouts MODIFY Checkout_ID INT NOT NULL AUTO_INCREMENT;
 
 
+-- STEP 1: DROP ALL DEPENDENT FOREIGN KEY CONSTRAINTS
+
+ALTER TABLE Team_Members
+DROP FOREIGN KEY team_members_ibfk_2;
+
+ALTER TABLE Event_Registrations
+DROP FOREIGN KEY event_registrations_ibfk_1;
+
+ALTER TABLE Match_Outcomes
+DROP FOREIGN KEY match_outcomes_ibfk_3;
+
+ALTER TABLE Match_Outcomes
+DROP FOREIGN KEY match_outcomes_ibfk_4;
+
+ALTER TABLE Match_Competitors
+DROP FOREIGN KEY match_competitors_ibfk_3;
+
+ALTER TABLE Incident_Reports
+DROP FOREIGN KEY incident_reports_ibfk_1;
+
+ALTER TABLE Financial_Transactions
+DROP FOREIGN KEY financial_transactions_ibfk_1;
+
+
+-- STEP 2: MODIFY COLUMN TO ADD AUTO_INCREMENT
+
+ALTER TABLE Participants
+MODIFY COLUMN Participant_ID INT NOT NULL AUTO_INCREMENT;
+
+
+-- STEP 3: RE-ADD ALL DROPPED FOREIGN KEY CONSTRAINTS
+
+ALTER TABLE Team_Members
+ADD CONSTRAINT fk_tm_participant
+FOREIGN KEY (Participant_ID) REFERENCES Participants(Participant_ID);
+
+ALTER TABLE Event_Registrations
+ADD CONSTRAINT fk_er_participant
+FOREIGN KEY (Participant_ID) REFERENCES Participants(Participant_ID);
+
+ALTER TABLE Match_Outcomes
+ADD CONSTRAINT fk_mo_winner
+FOREIGN KEY (Winning_Participant_ID) REFERENCES Participants(Participant_ID);
+
+ALTER TABLE Match_Outcomes
+ADD CONSTRAINT fk_mo_mvp
+FOREIGN KEY (MVP_Participant_ID) REFERENCES Participants(Participant_ID);
+
+ALTER TABLE Match_Competitors
+ADD CONSTRAINT fk_mc_participant
+FOREIGN KEY (Participant_ID) REFERENCES Participants(Participant_ID);
+
+ALTER TABLE Incident_Reports
+ADD CONSTRAINT fk_ir_participant
+FOREIGN KEY (Participant_ID) REFERENCES Participants(Participant_ID);
+
+ALTER TABLE Financial_Transactions
+ADD CONSTRAINT fk_ft_participant
+FOREIGN KEY (Participant_ID) REFERENCES Participants(Participant_ID);
 
 
 
